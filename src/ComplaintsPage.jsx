@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchComplaints, setFilters, setAppliedFilters, setCurrentPage, clearFilters } from './store/complaintsSlice';
 import ComplaintModal from './ComplaintModal';
+import { rembaseApp } from './backend';
 
-function ComplaintsPage() {
+function ComplaintsPage({ assignedToMe = false }) {
   const dispatch = useDispatch();
   const { complaints, loading, error, filters, appliedFilters, pagination } = useSelector((state) => state.complaints);
   
@@ -23,14 +24,24 @@ function ComplaintsPage() {
   });
 
   useEffect(() => {
-    dispatch(fetchComplaints());
-  }, [dispatch]);
+    if (assignedToMe) {
+      // If assignedToMe is true, automatically filter for complaints assigned to current user
+      const currentUser = rembaseApp?.currentUser;
+      if (currentUser) {
+        const assignedFilters = { assignedTo: currentUser.id };
+        dispatch(setAppliedFilters(assignedFilters));
+        dispatch(fetchComplaints(assignedFilters));
+      }
+    } else {
+      dispatch(fetchComplaints());
+    }
+  }, [dispatch, assignedToMe]);
 
   useEffect(() => {
-    if (Object.keys(appliedFilters).length > 0) {
+    if (Object.keys(appliedFilters).length > 0 && !assignedToMe) {
       dispatch(fetchComplaints(appliedFilters));
     }
-  }, [appliedFilters, dispatch]);
+  }, [appliedFilters, dispatch, assignedToMe]);
 
   const handleFilterChange = (key, value) => {
     setLocalFilters(prev => ({
@@ -110,7 +121,10 @@ function ComplaintsPage() {
   if (loading && complaints.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-gray-600">Loading complaints...</div>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="text-lg text-gray-600">Loading complaints...</div>
+        </div>
       </div>
     );
   }
@@ -126,157 +140,172 @@ function ComplaintsPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Complaints Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">
+          {assignedToMe ? 'Complaints Assigned to Me' : 'Complaints Management'}
+        </h1>
         
-        {/* Search and Basic Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search complaints..."
-              value={localFilters.query}
-              onChange={(e) => handleFilterChange('query', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div className="flex gap-2">
-            <select
-              value={localFilters.status}
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="assigned">Assigned</option>
-              <option value="in process">In Process</option>
-              <option value="resolved">Resolved</option>
-            </select>
-            
-            <select
-              value={localFilters.plan}
-              onChange={(e) => handleFilterChange('plan', e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Plans</option>
-              <option value="free">Free</option>
-              <option value="pro">Pro</option>
-              <option value="pro+">Pro+</option>
-            </select>
-            
-            <select
-              value={localFilters.isAssigned}
-              onChange={(e) => handleFilterChange('isAssigned', e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All</option>
-              <option value="true">Assigned</option>
-              <option value="false">Unassigned</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Advanced Filters Toggle */}
-        <div className="mb-4">
-          <button
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-          >
-            {showAdvancedFilters ? 'Hide' : 'Show'} Advanced Filters
-          </button>
-        </div>
-
-        {/* Advanced Filters */}
-        {showAdvancedFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-              <select
-                value={localFilters.city}
-                onChange={(e) => handleFilterChange('city', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Cities</option>
-                {uniqueCities.map(city => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Municipal Corporation</label>
-              <select
-                value={localFilters.municipalCorporation}
-                onChange={(e) => handleFilterChange('municipalCorporation', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Corporations</option>
-                {uniqueMunicipalCorporations.map(corp => (
-                  <option key={corp} value={corp}>{corp}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
-              <div className="flex gap-2">
+        {/* Search and Basic Filters - Only show if not in "Assigned to Me" mode */}
+        {!assignedToMe && (
+          <>
+            <div className="flex flex-col sm:flex-row gap-4 mb-4">
+              <div className="flex-1">
                 <input
-                  type="date"
-                  value={localFilters.dateFrom}
-                  onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <input
-                  type="date"
-                  value={localFilters.dateTo}
-                  onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  type="text"
+                  placeholder="Search complaints..."
+                  value={localFilters.query}
+                  onChange={(e) => handleFilterChange('query', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Filter Actions */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            onClick={handleApplyFilters}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            Apply Filters
-          </button>
-          
-          <button
-            onClick={handleResetFilters}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-          >
-            Reset All
-          </button>
-        </div>
-
-        {/* Active Filters */}
-        {Object.keys(appliedFilters).length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Active Filters:</h3>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(appliedFilters).map(([key, value]) => (
-                <span
-                  key={key}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+              
+              <div className="flex gap-2">
+                <select
+                  value={localFilters.status}
+                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {key}: {value}
-                  <button
-                    onClick={() => handleRemoveFilter(key)}
-                    className="ml-2 text-blue-600 hover:text-blue-800"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
+                  <option value="">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="assigned">Assigned</option>
+                  <option value="in process">In Process</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+                
+                <select
+                  value={localFilters.plan}
+                  onChange={(e) => handleFilterChange('plan', e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Plans</option>
+                  <option value="free">Free</option>
+                  <option value="pro">Pro</option>
+                  <option value="pro+">Pro+</option>
+                </select>
+                
+                <select
+                  value={localFilters.isAssigned}
+                  onChange={(e) => handleFilterChange('isAssigned', e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All</option>
+                  <option value="true">Assigned</option>
+                  <option value="false">Unassigned</option>
+                </select>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+
+            {/* Advanced Filters Toggle */}
+            <div className="mb-4">
+              <button
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="text-white hover:text-white text-sm font-medium"
+              >
+                {showAdvancedFilters ? 'Hide' : 'Show'} Advanced Filters
+              </button>
+            </div>
+
+            {/* Advanced Filters */}
+            {showAdvancedFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                  <select
+                    value={localFilters.city}
+                    onChange={(e) => handleFilterChange('city', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Cities</option>
+                    {uniqueCities.map(city => (
+                      <option key={city} value={city}>{city}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Municipal Corporation</label>
+                  <select
+                    value={localFilters.municipalCorporation}
+                    onChange={(e) => handleFilterChange('municipalCorporation', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Corporations</option>
+                    {uniqueMunicipalCorporations.map(corp => (
+                      <option key={corp} value={corp}>{corp}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={localFilters.dateFrom}
+                      onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="date"
+                      value={localFilters.dateTo}
+                      onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Filter Actions */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                onClick={handleApplyFilters}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Applying...
+                  </>
+                ) : (
+                  'Apply Filters'
+                )}
+              </button>
+              
+              <button
+                onClick={handleResetFilters}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+              >
+                Reset All
+              </button>
+            </div>
+
+            {/* Active Filters */}
+            {Object.keys(appliedFilters).length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Active Filters:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(appliedFilters).map(([key, value]) => (
+                    <span
+                      key={key}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors"
+                    >
+                      <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').toLowerCase()}: {value}</span>
+                      <button
+                        onClick={() => handleRemoveFilter(key)}
+                        className="ml-2 text-blue-600 hover:text-blue-800 transition-colors"
+                        title="Remove filter"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+                         )}
+           </>
+         )}
+       </div>
 
       {/* Complaints Table */}
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
@@ -310,7 +339,7 @@ function ComplaintsPage() {
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
-                      {complaint.desc}
+                      {complaint.desc?.slice(0, 50)}...
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

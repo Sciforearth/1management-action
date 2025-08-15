@@ -3,37 +3,16 @@ import { rembaseApp } from "./backend";
 import { useState } from "react";
 
 function LoginPage() {
-  const [contact, setContact] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  async function sendOTP() {
-    if (!contact) {
-      setError("Please enter a contact number");
-      return;
-    }
-    
-    setLoading(true);
-    setError("");
-    
-    try {
-      await rembaseApp?.sendWhatsappOTP(contact);
-      setOtpSent(true);
-    } catch (err) {
-      setError("Failed to send OTP. Please try again.");
-      console.error("OTP send error:", err);
-    } finally {
-      setLoading(false);  
-    }
-  }
 
   async function login(e) {
     e.preventDefault();
     
-    if (!otp) {
-      setError("Please enter the OTP");
+    if (!email || !password) {
+      setError("Please enter both email and password");
       return;
     }
     
@@ -41,10 +20,9 @@ function LoginPage() {
     setError("");
     
     try {
-      console.log(otp);
-      await rembaseApp?.login(CredentialTypes?.whatsapp("+919318455101", otp));
+      await rembaseApp?.login(CredentialTypes?.email_password(email, password));
     } catch (err) {
-      setError("Login failed. Please try again.");
+      setError("Login failed. Please check your email and password.");
       console.error("Login error:", err);
     } finally {
       setLoading(false);
@@ -56,51 +34,40 @@ function LoginPage() {
       <h2>Login</h2>
       <form onSubmit={login}>
         <div className="form-group">
-          <label htmlFor="contact">Contact Number:</label>
+          <label htmlFor="email">Email:</label>
           <input 
-            type="text" 
-            id="contact" 
-            name="contact" 
-            value={contact} 
-            onChange={(e) => setContact(e.target.value)}
-            placeholder="Enter contact number"
+            type="email" 
+            id="email" 
+            name="email" 
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
             disabled={loading}
+            required
           />
         </div>
         
-        {!otpSent ? (
-          <button 
-            type="button" 
-            onClick={sendOTP}
-            disabled={loading || !contact}
-            className="btn-primary"
-          >
-            {loading ? "Sending..." : "Send OTP"}
-          </button>
-        ) : (
-          <div className="form-group">
-            <label htmlFor="otp">OTP:</label>
-            <input 
-              type="text" 
-              id="otp" 
-              name="otp" 
-              value={otp} 
-              onChange={(e) => setOtp(e.target.value)}
-              placeholder="Enter OTP"
-              disabled={loading}
-            />
-          </div>
-        )}
+        <div className="form-group">
+          <label htmlFor="password">Password:</label>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            disabled={loading}
+            required
+          />
+        </div>
         
-        {otpSent && (
-          <button 
-            type="submit" 
-            disabled={loading || !otp}
-            className="btn-primary"
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
-        )}
+        <button 
+          type="submit" 
+          disabled={loading || !email || !password}
+          className="btn-primary"
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
         
         {error && <p className="error-message">{error}</p>}
         

@@ -6,93 +6,51 @@ export const fetchComplaints = createAsyncThunk(
   'complaints/fetchComplaints',
   async (filters = {}, { rejectWithValue }) => {
     try {
-      // Simulate API call - replace with actual rembaseApp call
-      const response = await new Promise((resolve) => {
-        setTimeout(() => {
-          // Mock data - replace with actual API response
-          const mockComplaints = [
-            {
-              "_id": "68891590cadccbcaf4dadce1",
-              "desc": "hbsdjcvokzxmn ebfwhijdpocsklxmdnucxk heijcskmx",
-              "strCode": "2002",
-              "aid": "id",
-              "assignedTo": "Name",
-              "status": "in process",
-              "plan": "pro",
-              "imageUrl": "https://oneapp1.s3.ap-south-1.amazonaws.com/Posts/non_logged/1753814393880_0.jpg",
-              "media_type": "image",
-              "coords": [77.10189435697313, 28.605817316957182],
-              "rs": false,
-              "type": "free",
-              "address": "5, L, Sagarpur East, Sagar Pur, New Delhi, Delhi, 110046, India",
-              "city": "New Delhi",
-              "state": "Delhi",
-              "municipalCorporation": "South West Delhi",
-              "date": "2025-07-29T18:40:16.881Z",
-              "updates": [
-                {
-                  "message": "Initial complaint registered",
-                  "date": "2025-07-29T18:40:16.881Z"
-                }
-              ],
-              "__v": 0
-            },
-            {
-              "_id": "6880a924f1e71a3843e581b8",
-              "desc": "Garbage accumulation in residential area",
-              "strCode": "2003",
-              "aid": "id2",
-              "assignedTo": "John Doe",
-              "status": "assigned",
-              "plan": "free",
-              "imageUrl": "",
-              "media_type": "image",
-              "coords": [77.10189435697313, 28.605817316957182],
-              "rs": false,
-              "type": "free",
-              "address": "10, Main Street, New Delhi, Delhi, 110001, India",
-              "city": "New Delhi",
-              "state": "Delhi",
-              "municipalCorporation": "Central Delhi",
-              "date": "2025-07-28T10:30:00.000Z",
-              "updates": [],
-              "__v": 0
-            }
-          ];
-          
-          // Apply filters if provided
-          let filteredComplaints = mockComplaints;
-          if (filters.query) {
-            filteredComplaints = filteredComplaints.filter(c => 
-              c.desc.toLowerCase().includes(filters.query.toLowerCase()) ||
-              c.city.toLowerCase().includes(filters.query.toLowerCase())
-            );
-          }
-          if (filters.status) {
-            filteredComplaints = filteredComplaints.filter(c => c.status === filters.status);
-          }
-          if (filters.plan) {
-            filteredComplaints = filteredComplaints.filter(c => c.plan === filters.plan);
-          }
-          if (filters.isAssigned !== undefined) {
-            filteredComplaints = filteredComplaints.filter(c => 
-              filters.isAssigned ? c.assignedTo : !c.assignedTo
-            );
-          }
-          if (filters.city) {
-            filteredComplaints = filteredComplaints.filter(c => c.city === filters.city);
-          }
-          if (filters.municipalCorporation) {
-            filteredComplaints = filteredComplaints.filter(c => c.municipalCorporation === filters.municipalCorporation);
-          }
-          
-          resolve({ complaints: filteredComplaints, filters });
-        }, 1000);
-      });
+      // Prepare filter payload for the API
+      const filterPayload = {};
       
-      return response;
+      // Add filters to payload if they exist
+      if (filters.query) {
+        filterPayload.query = filters.query;
+      }
+      if (filters.status) {
+        filterPayload.status = filters.status;
+      }
+      if (filters.plan) {
+        filterPayload.plan = filters.plan;
+      }
+      if (filters.isAssigned !== undefined) {
+        filterPayload.isAssigned = filters.isAssigned;
+      }
+      if (filters.city) {
+        filterPayload.city = filters.city;
+      }
+      if (filters.municipalCorporation) {
+        filterPayload.municipalCorporation = filters.municipalCorporation;
+      }
+      if (filters.dateFrom) {
+        filterPayload.dateFrom = filters.dateFrom;
+      }
+      if (filters.dateTo) {
+        filterPayload.dateTo = filters.dateTo;
+      }
+
+      // Call the real API
+      const response = await rembaseApp.currentUser?.callFunction("complaints", filterPayload);
+      
+      if (!response || !response.data) {
+        throw new Error('No data received from API');
+      }
+
+      // Return the complaints data with filters
+      return { 
+        complaints: response.data, 
+        filters: filterPayload 
+      };
+      
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Error fetching complaints:', error);
+      return rejectWithValue(error.message || 'Failed to fetch complaints');
     }
   }
 );
@@ -120,6 +78,39 @@ export const addComplaintUpdate = createAsyncThunk(
           message: update.message,
           date: update.date
         }
+      };
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// Async thunk for assigning complaint to current user
+export const assignComplaintToMe = createAsyncThunk(
+  'complaints/assignToMe',
+  async ({ complaintId }, { rejectWithValue }) => {
+    try {
+      const currentUser = rembaseApp?.currentUser;
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
+
+      const payload = {
+        id: complaintId,
+        assignedTo: currentUser.id,
+        assignedToName: currentUser.name || currentUser.email
+      };
+      
+      console.log('Assigning complaint to current user:', payload);
+      
+      // Call the rembaseApp function to assign complaint
+      await rembaseApp?.currentUser?.callFunction("issue/selfAssign", payload);
+      
+      // Return the assignment data
+      return {
+        complaintId,
+        assignedTo: currentUser.id,
+        assignedToName: currentUser.name || currentUser.email
       };
     } catch (error) {
       return rejectWithValue(error.message);
@@ -195,6 +186,24 @@ const complaintsSlice = createSlice({
         }
       })
       .addCase(addComplaintUpdate.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Assign complaint to me
+      .addCase(assignComplaintToMe.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(assignComplaintToMe.fulfilled, (state, action) => {
+        state.loading = false;
+        const { complaintId, assignedTo, assignedToName } = action.payload;
+        const complaint = state.complaints.find(c => c._id === complaintId);
+        if (complaint) {
+          complaint.assignedTo = assignedTo;
+          complaint.assignedToName = assignedToName;
+        }
+      })
+      .addCase(assignComplaintToMe.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

@@ -31,6 +31,14 @@ function DashboardPage() {
           </li>
           <li>
             <Link 
+              to="/dashboard/assigned-to-me" 
+              className={isActive('/dashboard/assigned-to-me') ? 'active' : ''}
+            >
+              Assigned to Me
+            </Link>
+          </li>
+          <li>
+            <Link 
               to="/dashboard/users"
               className={isActive('/dashboard/users') ? 'active' : ''}
             >Users</Link>
@@ -49,6 +57,7 @@ function DashboardPage() {
             </div>
           } />
           <Route path="/complaints" element={<ComplaintsPage />} />
+          <Route path="/assigned-to-me" element={<ComplaintsPage assignedToMe={true} />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/settings" element={
             <div>
