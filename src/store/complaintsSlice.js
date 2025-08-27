@@ -4,7 +4,7 @@ import { rembaseApp } from '../backend';
 // Async thunk for fetching complaints
 export const fetchComplaints = createAsyncThunk(
   'complaints/fetchComplaints',
-  async (filters = {}, { rejectWithValue }) => {
+  async (filters = {}, { rejectWithValue, getState }) => {
     try {
       // Prepare filter payload for the API
       const filterPayload = {};
@@ -34,6 +34,15 @@ export const fetchComplaints = createAsyncThunk(
       if (filters.dateTo) {
         filterPayload.dateTo = filters.dateTo;
       }
+      if (filters.strCode) {
+        filterPayload.strCode = filters.strCode;
+      }
+      
+      // Add pagination parameters
+      const state = getState();
+      const { currentPage: pageNum, itemsPerPage: limitNum } = state.complaints.pagination;
+      filterPayload.page = pageNum;
+      filterPayload.limit = limitNum;
 
       // Call the real API
       const response = await rembaseApp.currentUser?.callFunction("complaints", filterPayload);
@@ -42,15 +51,60 @@ export const fetchComplaints = createAsyncThunk(
         throw new Error('No data received from API');
       }
 
-      // Return the complaints data with filters
+      // Handle paginated response based on API structure
+      const complaints = response.data;
+      const totalItems = response.total;
+      const totalPages = response.totalPages;
+      const apiCurrentPage = response.currentPage;
+
+      // Return the complaints data with filters and pagination info
       return { 
-        complaints: response.data, 
-        filters: filterPayload 
+        complaints: complaints, 
+        filters: filterPayload,
+        totalItems: totalItems,
+        totalPages: totalPages,
+        currentPage: apiCurrentPage
       };
       
     } catch (error) {
       console.error('Error fetching complaints:', error);
       return rejectWithValue(error.message || 'Failed to fetch complaints');
+    }
+  }
+);
+
+// Async thunk for fetching complaints assigned to current user
+export const fetchAssignedComplaints = createAsyncThunk(
+  'complaints/fetchAssignedComplaints',
+  async (_, { rejectWithValue, getState }) => {
+    try {
+      // Pagination parameters
+      const state = getState();
+      const { currentPage: pageNum, itemsPerPage: limitNum } = state.complaints.pagination;
+
+      const payload = { page: pageNum, limit: limitNum };
+
+      const response = await rembaseApp.currentUser?.callFunction('issue/assigned', payload);
+
+      if (!response || !response.data) {
+        throw new Error('No data received from API');
+      }
+
+      const complaints = response.data;
+      const totalItems = response.total;
+      const totalPages = response.totalPages;
+      const apiCurrentPage = response.currentPage;
+
+      return {
+        complaints,
+        filters: {},
+        totalItems,
+        totalPages,
+        currentPage: apiCurrentPage,
+      };
+    } catch (error) {
+      console.error('Error fetching assigned complaints:', error);
+      return rejectWithValue(error.message || 'Failed to fetch assigned complaints');
     }
   }
 );
@@ -162,10 +216,29 @@ const complaintsSlice = createSlice({
       .addCase(fetchComplaints.fulfilled, (state, action) => {
         state.loading = false;
         state.complaints = action.payload.complaints;
-        state.pagination.totalItems = action.payload.complaints.length;
+        state.pagination.totalItems = action.payload.totalItems;
+        state.pagination.totalPages = action.payload.totalPages;
+        state.pagination.currentPage = action.payload.currentPage;
         state.filters = action.payload.filters;
       })
       .addCase(fetchComplaints.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Fetch assigned complaints
+      .addCase(fetchAssignedComplaints.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchAssignedComplaints.fulfilled, (state, action) => {
+        state.loading = false;
+        state.complaints = action.payload.complaints;
+        state.pagination.totalItems = action.payload.totalItems;
+        state.pagination.totalPages = action.payload.totalPages;
+        state.pagination.currentPage = action.payload.currentPage;
+        // filters not applicable here; leave as is
+      })
+      .addCase(fetchAssignedComplaints.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

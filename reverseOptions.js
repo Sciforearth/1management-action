@@ -1,0 +1,30 @@
+export default {
+    "0001": { "request": "Municipal Complaints", "type": "Garbage Problem" },
+    "0002": { "request": "Municipal Complaints", "type": "Broken Roads" },
+    "0006": { "request": "Municipal Complaints", "type": "Bad Quality material in construction" },
+    "0007": { "request": "Municipal Complaints", "type": "Open Manhole" },
+    "0008": { "request": "Municipal Complaints", "type": "Request garbage bin" },
+    "0009": { "request": "Municipal Complaints", "type": "Unfinished Constructions" },
+    "0010": { "request": "Municipal Complaints", "type": "Unhygienic public toilets" },
+    "0011": { "request": "Municipal Complaints", "type": "Dust" },
+    "0012": { "request": "Municipal Complaints", "type": "Illegal public Advertisement" },
+    "1001": { "request": "Water-related Complaints", "type": "Sewer overflowing" },
+    "1002": { "request": "Water-related Complaints", "type": "Water logging" },
+    "1003": { "request": "Water-related Complaints", "type": "Need water pipeline" },
+    "2001": { "request": "Electricity-Related Complaints", "type": "No Streetlights (residential area)" },
+    "2002": { "request": "Electricity-Related Complaints", "type": "Power Cuts" }, 
+    "2003": { "request": "Electricity-Related Complaints", "type": "New connection" },
+    "3001": { "request": "Hospital related", "type": "No beds in Hospitals" },
+    "3002": { "request": "Hospital related", "type": "Unhygienic conditions" },
+    "3003": { "request": "Hospital related", "type": "Dotor Absent" },
+    "3004": { "request": "Hospital related", "type": "Medicine not available" },
+    "4001": { "request": "Education and school related", "type": "Broken School buildings" },
+    "4002": { "request": "Education and school related", "type": "Broken Desks" },
+    "5001" :  { "request": "Special", "type": "Nal jal Yojna" },
+    "-100": { "request": "Happening for good", "type": "Cleanliness drives by NGOs" },
+    "-101": { "request": "Happening for good", "type": "Schools taking initiative" },
+    "P10001": { "request": "Protests", "type": "Justice for Maumita and Women Safety" },
+    "-1": { "request": "Other Problems", "type": "Other Problems" }
+
+  };
+  

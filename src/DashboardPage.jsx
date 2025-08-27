@@ -1,6 +1,7 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import ComplaintsPage from './ComplaintsPage';
 import UsersPage from './UsersPage';
+import DashboardMain from './pages/DashboardMain';
 
 function DashboardPage() {
   const location = useLocation();
@@ -51,10 +52,7 @@ function DashboardPage() {
       <div className="main-content">
         <Routes>
           <Route path="/" element={
-            <div>
-              <h1>Welcome to the Dashboard!</h1>
-              <p>This is your administrative dashboard.</p>
-            </div>
+            <DashboardMain/>
           } />
           <Route path="/complaints" element={<ComplaintsPage />} />
           <Route path="/assigned-to-me" element={<ComplaintsPage assignedToMe={true} />} />

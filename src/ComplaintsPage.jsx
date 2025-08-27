@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchComplaints, setFilters, setAppliedFilters, setCurrentPage, clearFilters } from './store/complaintsSlice';
+import { fetchComplaints, fetchAssignedComplaints, setFilters, setAppliedFilters, setCurrentPage, clearFilters } from './store/complaintsSlice';
 import ComplaintModal from './ComplaintModal';
 import { rembaseApp } from './backend';
+import optionsData from '../options';
 
 function ComplaintsPage({ assignedToMe = false }) {
   const dispatch = useDispatch();
@@ -10,6 +11,7 @@ function ComplaintsPage({ assignedToMe = false }) {
   
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [problemTypes, setProblemTypes] = useState([]);
 
   // Local filter state
   const [localFilters, setLocalFilters] = useState({
@@ -20,22 +22,45 @@ function ComplaintsPage({ assignedToMe = false }) {
     city: '',
     municipalCorporation: '',
     dateFrom: '',
-    dateTo: ''
+    dateTo: '',
+    strCode: ''
   });
 
+  // Process problem types from options.json
+  const processProblemTypes = () => {
+    const problemTypesArray = [];
+    
+    // Convert the nested structure to a flat array
+    Object.entries(optionsData).forEach(([category, problems]) => {
+      Object.entries(problems).forEach(([problemName, problemCode]) => {
+        problemTypesArray.push({
+          code: problemCode,
+          name: problemName,
+          category: category
+        });
+      });
+    });
+    
+    console.log('Processed problem types:', problemTypesArray);
+    setProblemTypes(problemTypesArray);
+  };
+
   useEffect(() => {
+    // Process problem types on component mount
+    processProblemTypes();
+    
     if (assignedToMe) {
-      // If assignedToMe is true, automatically filter for complaints assigned to current user
-      const currentUser = rembaseApp?.currentUser;
-      if (currentUser) {
-        const assignedFilters = { assignedTo: currentUser.id };
-        dispatch(setAppliedFilters(assignedFilters));
-        dispatch(fetchComplaints(assignedFilters));
-      }
+      // Load complaints assigned to current user via dedicated endpoint
+      dispatch(fetchAssignedComplaints());
     } else {
       dispatch(fetchComplaints());
     }
   }, [dispatch, assignedToMe]);
+
+  // Debug: Log when problemTypes changes
+  useEffect(() => {
+    console.log('Problem types state updated:', problemTypes);
+  }, [problemTypes]);
 
   useEffect(() => {
     if (Object.keys(appliedFilters).length > 0 && !assignedToMe) {
@@ -72,7 +97,8 @@ function ComplaintsPage({ assignedToMe = false }) {
       city: '',
       municipalCorporation: '',
       dateFrom: '',
-      dateTo: ''
+      dateTo: '',
+      strCode: ''
     });
     dispatch(clearFilters());
     dispatch(setCurrentPage(1));
@@ -98,6 +124,12 @@ function ComplaintsPage({ assignedToMe = false }) {
 
   const handlePageChange = (page) => {
     dispatch(setCurrentPage(page));
+    // Fetch complaints with the new page
+    if (assignedToMe) {
+      dispatch(fetchAssignedComplaints());
+    } else {
+      dispatch(fetchComplaints(appliedFilters));
+    }
   };
 
   const handleRowClick = (complaint) => {
@@ -108,11 +140,9 @@ function ComplaintsPage({ assignedToMe = false }) {
     setSelectedComplaint(null);
   };
 
-  // Pagination logic
-  const totalPages = Math.ceil(pagination.totalItems / pagination.itemsPerPage);
-  const startIndex = (pagination.currentPage - 1) * pagination.itemsPerPage;
-  const endIndex = startIndex + pagination.itemsPerPage;
-  const currentComplaints = complaints.slice(startIndex, endIndex);
+  // Pagination logic - use server-side pagination
+  const totalPages = pagination.totalPages || Math.ceil(pagination.totalItems / pagination.itemsPerPage);
+  const currentComplaints = complaints; // API already returns paginated data
 
   // Get unique values for filter options
   const uniqueCities = useMemo(() => [...new Set(complaints.map(c => c.city))], [complaints]);
@@ -191,6 +221,19 @@ function ComplaintsPage({ assignedToMe = false }) {
                   <option value="true">Assigned</option>
                   <option value="false">Unassigned</option>
                 </select>
+                
+                <select
+                  value={localFilters.strCode}
+                  onChange={(e) => handleFilterChange('strCode', e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Problem Types ({problemTypes.length})</option>
+                  {problemTypes.map((problemType, index) => (
+                    <option key={problemType.code} value={problemType.code}>
+                      {problemType.name} ({problemType.category})
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -206,7 +249,7 @@ function ComplaintsPage({ assignedToMe = false }) {
 
             {/* Advanced Filters */}
             {showAdvancedFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                   <select
@@ -231,6 +274,22 @@ function ComplaintsPage({ assignedToMe = false }) {
                     <option value="">All Corporations</option>
                     {uniqueMunicipalCorporations.map(corp => (
                       <option key={corp} value={corp}>{corp}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Problem Type</label>
+                  <select
+                    value={localFilters.strCode}
+                    onChange={(e) => handleFilterChange('strCode', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Problem Types ({problemTypes.length})</option>
+                    {problemTypes.map((problemType, index) => (
+                      <option key={problemType.code} value={problemType.code}>
+                        {problemType.name} ({problemType.category})
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -339,7 +398,7 @@ function ComplaintsPage({ assignedToMe = false }) {
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
-                      {complaint.desc?.slice(0, 50)}...
+                      {complaint.desc?.slice(0, 50) || complaint.description?.slice(0, 50)}...
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -373,39 +432,94 @@ function ComplaintsPage({ assignedToMe = false }) {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-between">
-          <div className="text-sm text-gray-700">
-            Showing {startIndex + 1} to {Math.min(endIndex, pagination.totalItems)} of {pagination.totalItems} results
+      {complaints.length > 0 && (
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-sm text-gray-700 text-center sm:text-left">
+            Showing {currentComplaints.length} of {pagination.totalItems} results (Page {pagination.currentPage} of {totalPages})
           </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => handlePageChange(pagination.currentPage - 1)}
-              disabled={pagination.currentPage === 1}
-              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`px-3 py-2 text-sm font-medium rounded-md ${
-                  page === pagination.currentPage
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              onClick={() => handlePageChange(pagination.currentPage + 1)}
-              disabled={pagination.currentPage === totalPages}
-              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
+          <div className="flex flex-wrap justify-center gap-1">
+            {totalPages > 1 && (
+              <>
+                <button
+                  onClick={() => handlePageChange(pagination.currentPage - 1)}
+                  disabled={pagination.currentPage === 1}
+                  className="px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                {/* Smart pagination with ellipsis */}
+                {(() => {
+                  const currentPage = pagination.currentPage;
+                  const totalPagesNum = totalPages;
+                  const pages = [];
+                  
+                  if (totalPagesNum <= 7) {
+                    // Show all pages if 7 or fewer
+                    for (let i = 1; i <= totalPagesNum; i++) {
+                      pages.push(i);
+                    }
+                  } else {
+                    // Show smart pagination for more than 7 pages
+                    if (currentPage <= 4) {
+                      // Show first 5 pages + ellipsis + last page
+                      for (let i = 1; i <= 5; i++) {
+                        pages.push(i);
+                      }
+                      pages.push('...');
+                      pages.push(totalPagesNum);
+                    } else if (currentPage >= totalPagesNum - 3) {
+                      // Show first page + ellipsis + last 5 pages
+                      pages.push(1);
+                      pages.push('...');
+                      for (let i = totalPagesNum - 4; i <= totalPagesNum; i++) {
+                        pages.push(i);
+                      }
+                    } else {
+                      // Show first page + ellipsis + current-1, current, current+1 + ellipsis + last page
+                      pages.push(1);
+                      pages.push('...');
+                      for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+                        pages.push(i);
+                      }
+                      pages.push('...');
+                      pages.push(totalPagesNum);
+                    }
+                  }
+                  
+                  return pages.map((page, index) => (
+                    page === '...' ? (
+                      <span key={`ellipsis-${index}`} className="px-3 py-2 text-sm text-gray-500">
+                        ...
+                      </span>
+                    ) : (
+                                             <button
+                         key={page}
+                         onClick={() => handlePageChange(page)}
+                         className={`px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors ${
+                           page === currentPage
+                             ? 'bg-blue-600 text-white shadow-sm'
+                             : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                         }`}
+                       >
+                         {page}
+                       </button>
+                    )
+                  ));
+                })()}
+                <button
+                  onClick={() => handlePageChange(pagination.currentPage + 1)}
+                  disabled={pagination.currentPage === totalPages}
+                  className="px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </>
+            )}
+            {totalPages <= 1 && complaints.length > 0 && (
+              <div className="text-sm text-gray-500">
+                Page 1 of 1
+              </div>
+            )}
           </div>
         </div>
       )}
