@@ -21,7 +21,7 @@ function LoginPage() {
     
     try {
       await rembaseApp?.login(CredentialTypes?.email_password(email, password));
-      window.location.reload()
+      window.location.href= "/"
     } catch (err) {
       setError("Login failed. Please check your email and password.");
       console.error("Login error:", err);
