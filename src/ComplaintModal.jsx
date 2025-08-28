@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { addComplaintUpdate, assignComplaintToMe } from './store/complaintsSlice';
 import { rembaseApp } from './backend';
@@ -13,6 +13,16 @@ function ComplaintModal({ complaint, onClose }) {
   const [assignedComplaints, setAssignedComplaints] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
+  const [localUpdates, setLocalUpdates] = useState(complaint.updates || []);
+  const [assignedToLocal, setAssignedToLocal] = useState(complaint.assignedTo);
+  const [assignedToNameLocal, setAssignedToNameLocal] = useState(complaint.assignedToName);
+
+  // When a new complaint is opened, sync local updates
+  useEffect(() => {
+    setLocalUpdates(complaint.updates || []);
+    setAssignedToLocal(complaint.assignedTo);
+    setAssignedToNameLocal(complaint.assignedToName);
+  }, [complaint]);
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -72,6 +82,9 @@ function ComplaintModal({ complaint, onClose }) {
         update: updateData 
       })).unwrap();
       
+      // Optimistically update UI without refetch
+      setLocalUpdates(prev => [...prev, updateData]);
+
       // Clear the form and close the add update section
       setNewUpdate('');
       setShowAddUpdate(false);
@@ -93,6 +106,13 @@ function ComplaintModal({ complaint, onClose }) {
         complaintId: complaint._id 
       })).unwrap();
       
+      // Optimistically update local assignment data
+      const currentUser = rembaseApp?.currentUser;
+      if (currentUser) {
+        setAssignedToLocal(currentUser.id);
+        setAssignedToNameLocal(currentUser.name || currentUser.email);
+      }
+
       alert('Complaint assigned to you successfully!');
       
     } catch (error) {
@@ -119,6 +139,9 @@ function ComplaintModal({ complaint, onClose }) {
         update: updateData 
       })).unwrap();
       
+      // Optimistically update UI
+      setLocalUpdates(prev => [...prev, updateData]);
+
       // Clear the form and close modals
       setDeleteReason('');
       setShowDeleteModal(false);
@@ -142,11 +165,9 @@ function ComplaintModal({ complaint, onClose }) {
     const currentUser = rembaseApp?.currentUser;
     if (!currentUser) return false;
     
-    // Check if user is mcEmployee
     const isMcEmployee = currentUser.customData?.userType === 'mcEmployee';
-    
-    // Check if user is assigned to this complaint
-    const isAssigned = complaint.assignedTo === currentUser.id;
+    const effectiveAssignedTo = assignedToLocal || complaint.assignedTo;
+    const isAssigned = effectiveAssignedTo === currentUser.id;
     
     return isMcEmployee || isAssigned;
   };
@@ -160,7 +181,7 @@ function ComplaintModal({ complaint, onClose }) {
   const isAssignedToMe = () => {
     const currentUser = rembaseApp?.currentUser;
     if (!currentUser) return false;
-    return complaint.assignedTo === currentUser.id;
+    return (assignedToLocal || complaint.assignedTo) === currentUser.id;
   };
 
   return (
@@ -211,7 +232,7 @@ function ComplaintModal({ complaint, onClose }) {
                     : 'border-transparent text-white '
                 }`}
               >
-                Updates ({complaint.updates?.length || 0})
+                Updates ({localUpdates.length})
               </button>
             )}
           </nav>
@@ -252,7 +273,7 @@ function ComplaintModal({ complaint, onClose }) {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Assigned To</label>
-                  <p className="mt-1 text-sm text-gray-900">{complaint.assignedTo || 'Unassigned'}</p>
+                  <p className="mt-1 text-sm text-gray-900">{assignedToNameLocal || assignedToLocal || complaint.assignedTo || 'Unassigned'}</p>
                 </div>
               </div>
 
@@ -398,9 +419,9 @@ function ComplaintModal({ complaint, onClose }) {
               </div>
             )}
             
-            {complaint.updates && complaint.updates.length > 0 ? (
+            {localUpdates && localUpdates.length > 0 ? (
               <div className="space-y-4">
-                {complaint.updates.map((update, index) => (
+                {localUpdates.map((update, index) => (
                   <div key={index} className="bg-gray-50 p-4 rounded-lg">
                     <p className="text-sm font-medium text-gray-900">{update.message}</p>
                     <p className="text-xs text-gray-500 mt-1">{formatDate(update.date)}</p>

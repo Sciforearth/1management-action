@@ -112,7 +112,7 @@ export const fetchAssignedComplaints = createAsyncThunk(
 // Async thunk for adding an update
 export const addComplaintUpdate = createAsyncThunk(
   'complaints/addUpdate',
-  async ({ complaintId, update }, { rejectWithValue, getState }) => {
+  async ({ complaintId, update }, { rejectWithValue }) => {
     try {
       const payload = {
         date: update.date,
@@ -124,7 +124,7 @@ export const addComplaintUpdate = createAsyncThunk(
       
       // Call the rembaseApp function
       await rembaseApp?.currentUser?.callFunction("issue_update/create", payload);
-      
+
       // Return the update data to add to local state
       return {
         complaintId,
@@ -178,6 +178,8 @@ const initialState = {
   error: null,
   filters: {},
   appliedFilters: {},
+  // Track which list is currently in view so we can refresh appropriately
+  listSource: 'all', // 'all' | 'assigned'
   pagination: {
     currentPage: 1,
     itemsPerPage: 10,
@@ -194,6 +196,9 @@ const complaintsSlice = createSlice({
     },
     setAppliedFilters: (state, action) => {
       state.appliedFilters = action.payload;
+    },
+    setListSource: (state, action) => {
+      state.listSource = action.payload; // 'all' | 'assigned'
     },
     setCurrentPage: (state, action) => {
       state.pagination.currentPage = action.payload;
@@ -288,7 +293,8 @@ export const {
   setAppliedFilters, 
   setCurrentPage, 
   clearFilters, 
-  clearError 
+  clearError,
+  setListSource 
 } = complaintsSlice.actions;
 
 export default complaintsSlice.reducer; 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchComplaints, fetchAssignedComplaints, setFilters, setAppliedFilters, setCurrentPage, clearFilters } from './store/complaintsSlice';
+import { fetchComplaints, fetchAssignedComplaints, setFilters, setAppliedFilters, setCurrentPage, clearFilters, setListSource } from './store/complaintsSlice';
 import ComplaintModal from './ComplaintModal';
 import { rembaseApp } from './backend';
 import optionsData from '../options';
@@ -50,9 +50,11 @@ function ComplaintsPage({ assignedToMe = false }) {
     processProblemTypes();
     
     if (assignedToMe) {
+      dispatch(setListSource('assigned'));
       // Load complaints assigned to current user via dedicated endpoint
       dispatch(fetchAssignedComplaints());
     } else {
+      dispatch(setListSource('all'));
       dispatch(fetchComplaints());
     }
   }, [dispatch, assignedToMe]);
